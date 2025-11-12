@@ -9,6 +9,7 @@ const port = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
+// MongoDB Connection
 const uri =
   "mongodb+srv://plateshare_db:8CylrlFds3PCmVrX@cluster0.bsfywqv.mongodb.net/?appName=Cluster0";
 
@@ -23,16 +24,16 @@ const client = new MongoClient(uri, {
 async function connectDB() {
   try {
     await client.connect();
-    console.log(" Connected to MongoDB successfully!");
+    console.log("Connected to MongoDB successfully!");
   } catch (err) {
-    console.error(" MongoDB connection error:", err);
+    console.error("MongoDB connection error:", err);
   }
 }
 connectDB();
 
 const database = client.db("plateshare_db");
 const foods = database.collection("foods");
-
+const foodRequests = database.collection("foodRequests"); 
 
 
 app.post("/add-food", async (req, res) => {
@@ -154,17 +155,103 @@ app.get("/my-foods", async (req, res) => {
 app.get("/top-foods", async (req, res) => {
   const topFoods = await foods
     .find({})
-    .sort({ food_quantity: -1 }) // biggest first
+    .sort({ food_quantity: -1 })
     .limit(6)
     .toArray();
 
   res.status(200).json(topFoods);
 });
 
-app.get("/", (req, res) => {
-  res.send("Smart server is running ");
+// ------------------- FOOD REQUEST ROUTES -------------------
+
+app.post("/foodRequests", async (req, res) => {
+  const {
+    foodId,
+    userEmail,
+    name,
+    photoURL,
+    location,
+    reason,
+    contactNo,
+    status,
+  } = req.body;
+
+  if (!foodId || !userEmail || !location || !reason || !contactNo) {
+    return res.status(400).json({ error: "Missing required fields" });
+  }
+
+  const requestDoc = {
+    foodId,
+    userEmail,
+    name: name || "",
+    photoURL: photoURL || "",
+    location,
+    reason,
+    contactNo,
+    status: status || "pending",
+    createdAt: new Date(),
+  };
+
+  try {
+    const result = await foodRequests.insertOne(requestDoc);
+    res.status(201).json({
+      message: "Food request submitted successfully",
+      insertedId: result.insertedId,
+    });
+  } catch (err) {
+    console.error("Error creating food request:", err);
+    res.status(500).json({ error: "Failed to submit food request" });
+  }
 });
 
+app.get("/foodRequests", async (req, res) => {
+  try {
+    const requests = await foodRequests.find({}).toArray();
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Error fetching requests:", err);
+    res.status(500).json({ error: "Failed to fetch food requests" });
+  }
+});
+
+app.get("/foodRequests/:foodId", async (req, res) => {
+  const { foodId } = req.params;
+  try {
+    const requests = await foodRequests.find({ foodId }).toArray();
+    res.status(200).json(requests);
+  } catch (err) {
+    console.error("Error fetching requests for food:", err);
+    res.status(500).json({ error: "Failed to fetch requests" });
+  }
+});
+
+app.patch("/foodRequests/:id", async (req, res) => {
+  const { id } = req.params;
+  const { status } = req.body;
+
+  if (!status) return res.status(400).json({ error: "Status is required" });
+
+  try {
+    const result = await foodRequests.updateOne(
+      { _id: ObjectId.isValid(id) ? new ObjectId(id) : id },
+      { $set: { status } }
+    );
+
+    if (result.matchedCount === 0)
+      return res.status(404).json({ error: "Request not found" });
+
+    res.status(200).json({ message: "Request status updated successfully" });
+  } catch (err) {
+    console.error("Error updating request:", err);
+    res.status(500).json({ error: "Failed to update request" });
+  }
+});
+
+app.get("/", (req, res) => {
+  res.send("Smart server is running");
+});
+
+// Start server
 app.listen(port, () => {
-  console.log(` Smart server is running on port ${port}`);
+  console.log(`Smart server is running on port ${port}`);
 });
