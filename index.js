@@ -28,13 +28,12 @@ async function connectDB() {
 }
 connectDB();
 
-// Database & collection
 const database = client.db("plateshare_db");
 const foods = database.collection("foods");
 
 
 
-// Add Food (Create)
+// Add Food 
 app.post('/add-food', async (req, res) => {
   const {
     food_name,
@@ -86,7 +85,7 @@ app.get('/food/:id', async (req, res) => {
   const database = client.db("plateshare_db");
   const foods = database.collection("foods");
 
-  const food = await foods.findOne({ _id: id }); // Treat _id as string
+  const food = await foods.findOne({ _id: id }); 
 
   if (!food) return res.status(404).json({ error: "Food not found" });
 
@@ -95,13 +94,48 @@ app.get('/food/:id', async (req, res) => {
 
 
 
+app.delete('/delete-food/:id', async (req, res) => {
+  const { id } = req.params;
 
-// Root route
+  let query = {};
+  if (ObjectId.isValid(id)) {
+   
+    query = { _id: new ObjectId(id) };
+  } else {
+   
+    query = { _id: id };
+  }
+
+  const result = await foods.deleteOne(query);
+
+  if (result.deletedCount === 0) {
+    return res.status(404).json({ error: "Food not found" });
+  }
+
+  res.status(200).json({
+    message: "Food deleted successfully",
+    deletedCount: result.deletedCount
+  });
+});
+
+
+
+app.get('/my-foods', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ error: "Donator email is required" });
+
+  const myFoods = await foods.find({ donator_email: email }).toArray();
+  res.status(200).json(myFoods);
+});
+
+
+
+
 app.get('/', (req, res) => {
   res.send('Smart server is running');
 });
 
-// Start server
+
 app.listen(port, () => {
   console.log(`Smart server is running on port ${port}`);
 });
