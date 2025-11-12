@@ -81,6 +81,19 @@ app.get('/available-foods', async (req, res) => {
   res.status(200).json(availableFoods);
 });
 
+app.get('/food/:id', async (req, res) => {
+  const { id } = req.params;
+  const database = client.db("plateshare_db");
+  const foods = database.collection("foods");
+
+  const food = await foods.findOne({ _id: id }); // Treat _id as string
+
+  if (!food) return res.status(404).json({ error: "Food not found" });
+
+  res.status(200).json(food);
+});
+
+
 
 
 // Root route
